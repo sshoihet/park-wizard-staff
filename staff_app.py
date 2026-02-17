@@ -5,7 +5,14 @@ from datetime import datetime
 
 # --- CONFIGURATION ---
 DATA_FILE = "knowledge_base.json"
-STAFF_PASSWORD = "Splash2026"  # <--- CHANGE THIS FOR PRODUCTION
+
+# SECURE PASSWORD HANDLING
+# Try to load from Streamlit Secrets (Cloud), otherwise default to local dev password
+if "STAFF_PASSWORD" in st.secrets:
+    STAFF_PASSWORD = st.secrets["STAFF_PASSWORD"]
+else:
+    # Fallback for when you run it locally on your laptop
+    STAFF_PASSWORD = "LocalDevPassword123" 
 
 # --- 1. THEME & CSS INJECTION ---
 def load_css():
