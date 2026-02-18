@@ -219,4 +219,21 @@ def main():
         all_cases = load_data()
         results = list(search_cases(query, all_cases))
         
-        st.markdown(f"<div style='color: #8898aa; font-size: 0.8rem; margin-bottom: 10px;'>Found {len(results)} records</div>", unsafe_allow
+        st.markdown(f"<div style='color: #8898aa; font-size: 0.8rem; margin-bottom: 10px;'>Found {len(results)} records</div>", unsafe_allow_html=True)
+        
+        if not results and not query:
+            st.info("Start logging cases to build the brain!")
+        
+        for case in results:
+            icon = "🔧"
+            if "Activator" in str(case.get('tech_category')): icon = "🔴"
+            if "Valve" in str(case.get('tech_category')): icon = "💧"
+            if "Controller" in str(case.get('tech_category')): icon = "⚡"
+            
+            with st.expander(f"{icon} {case.get('specific_diagnosis', 'Unknown Issue')}"):
+                st.markdown(f"**Customer Said:** *\"{case.get('customer_verbatim', 'N/A')}\"*")
+                st.markdown(f"**The Fix:** {case.get('fix_action', 'N/A')}")
+                st.markdown(f"<small style='color:#f58025'>Cause: {case.get('root_cause_type')} | Context: {case.get('lifecycle')}</small>", unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
