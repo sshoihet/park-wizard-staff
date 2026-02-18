@@ -7,12 +7,11 @@ from datetime import datetime
 DATA_FILE = "knowledge_base.json"
 
 # SECURE PASSWORD HANDLING
-# Try to load from Streamlit Secrets (Cloud), otherwise default to local dev password
+# Checks Streamlit Secrets first (Cloud), falls back to local (Testing)
 if "STAFF_PASSWORD" in st.secrets:
     STAFF_PASSWORD = st.secrets["STAFF_PASSWORD"]
 else:
-    # Fallback for when you run it locally on your laptop
-    STAFF_PASSWORD = "LocalDevPassword123" 
+    STAFF_PASSWORD = "Splash2026"  # Default for local testing only
 
 # --- 1. THEME & CSS INJECTION ---
 def load_css():
@@ -61,7 +60,7 @@ def load_css():
                 font-size: 0.8rem; color: var(--brand-orange); text-transform: uppercase; margin-left: 10px;
             }
 
-            /* --- INPUT FIELDS (Matching style.css) --- */
+            /* --- INPUT FIELDS --- */
             .stTextInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
                 background-color: rgba(19, 42, 74, 0.6) !important;
                 border: 1px solid rgba(255,255,255,0.2) !important;
@@ -70,7 +69,7 @@ def load_css():
             }
             
             /* Focus State */
-            .stTextInput input:focus {
+            .stTextInput input:focus, .stTextArea textarea:focus {
                 border-color: var(--brand-orange) !important;
                 box-shadow: 0 0 10px rgba(245, 128, 37, 0.2) !important;
             }
@@ -81,10 +80,11 @@ def load_css():
                 color: white;
                 border: none;
                 border-radius: 50px;
-                padding: 0.5rem 2rem;
+                padding: 0.6rem 2rem;
                 font-weight: 600;
                 transition: all 0.3s ease;
                 box-shadow: 0 4px 10px rgba(245, 128, 37, 0.2);
+                width: 100%;
             }
             div.stButton > button:hover {
                 background-color: #d16b1e;
@@ -93,7 +93,7 @@ def load_css():
                 color: white;
             }
 
-            /* --- CARDS / EXPANDERS --- */
+            /* --- EXPANDERS --- */
             .streamlit-expanderHeader {
                 background-color: var(--card-bg);
                 border: 1px solid rgba(255,255,255,0.1);
@@ -106,6 +106,11 @@ def load_css():
                 background-color: rgba(140, 198, 63, 0.1);
                 border: 1px solid var(--brand-green);
                 color: var(--brand-green);
+            }
+            .stWarning {
+                background-color: rgba(245, 128, 37, 0.1);
+                border: 1px solid var(--brand-orange);
+                color: var(--brand-orange);
             }
         </style>
     """, unsafe_allow_html=True)
@@ -127,44 +132,48 @@ def save_case(case_data):
         json.dump(data, f, indent=2)
 
 def search_cases(query, cases):
-    if not query: return cases[-10:]
+    if not query: return cases[-10:] # Return last 10 default
     query = query.lower()
-    results = [c for c in cases if query in str(c).lower()]
+    # Search across all relevant fields (The "Brain")
+    results = [c for c in cases if (
+        query in str(c.get('customer_verbatim', '')).lower() or
+        query in str(c.get('specific_diagnosis', '')).lower() or
+        query in str(c.get('fix_action', '')).lower() or
+        query in str(c.get('tech_category', '')).lower()
+    )]
     return reversed(results)
 
-# --- 3. LOGIN SCREEN (Matches Login Overlay) ---
+# --- 3. LOGIN SCREEN ---
 def check_password():
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
 
     if not st.session_state.password_correct:
-        # Centered Login Box
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.markdown("<br><br><br>", unsafe_allow_html=True)
-            with st.container():
-                st.markdown("""
-                <div style="text-align: center; background: #132a4a; padding: 40px; border-radius: 12px; border: 1px solid #9b59b6; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
-                    <h2 style="color: white; margin-bottom: 5px;">PARK WIZARD</h2>
-                    <p style="color: #9b59b6; font-size: 0.9rem; letter-spacing: 2px; text-transform: uppercase;">Staff Access Only</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                pwd = st.text_input("Enter Access Code", type="password", label_visibility="collapsed", placeholder="ACCESS CODE")
-                
-                if st.button("LOGIN", use_container_width=True):
-                    if pwd == STAFF_PASSWORD:
-                        st.session_state.password_correct = True
-                        st.rerun()
-                    else:
-                        st.error("⛔ Access Denied")
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.markdown("""
+            <div style="text-align: center; background: #132a4a; padding: 40px; border-radius: 12px; border: 1px solid #9b59b6; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                <h2 style="color: white; margin-bottom: 5px;">PARK WIZARD</h2>
+                <p style="color: #9b59b6; font-size: 0.9rem; letter-spacing: 2px; text-transform: uppercase;">Staff Access Only</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            pwd = st.text_input("Enter Access Code", type="password", label_visibility="collapsed", placeholder="ACCESS CODE")
+            
+            if st.button("LOGIN"):
+                if pwd == STAFF_PASSWORD:
+                    st.session_state.password_correct = True
+                    st.rerun()
+                else:
+                    st.error("⛔ Access Denied")
         return False
     return True
 
 # --- 4. MAIN DASHBOARD ---
 def main():
-    st.set_page_config(page_title="Park Wizard Staff", layout="wide")
-    load_css() # Inject the theme
+    st.set_page_config(page_title="Park Wizard Hive", page_icon="🧠", layout="wide")
+    load_css()
 
     if not check_password():
         return
@@ -180,62 +189,83 @@ def main():
     # -- Layout --
     col_log, col_search = st.columns([1.2, 1])
 
-    # --- LEFT COL: THE LOGGER ---
+    # --- LEFT COL: THE LOGGER (New Diagnostic Schema) ---
     with col_log:
-        st.markdown("### 📝 Log a Fix")
+        st.markdown("### 📝 Log a Diagnostic Fix")
         with st.container():
             st.markdown('<div style="background: rgba(19,42,74,0.4); padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">', unsafe_allow_html=True)
             
             with st.form("logger"):
-                c1, c2 = st.columns(2)
+                st.caption("1. THE CUSTOMER'S VOICE (Crucial for AI)")
+                customer_verbatim = st.text_input("What did the customer say/see?", 
+                    placeholder="e.g. 'The button feels mushy and nothing happens'")
+
+                st.caption("2. THE CONTEXT")
+                c1, c2, c3 = st.columns(3)
                 with c1:
-                    cat = st.selectbox("Category", ["Solenoid Valve", "Controller", "Activator", "Pump", "Plumbing"])
+                    lifecycle = st.selectbox("Lifecycle", ["Spring Startup", "Daily Operation", "Winterizing", "New Install"])
                 with c2:
-                    tags = st.multiselect("Tags", ["Spring Startup", "Freeze Damage", "New Install", "High Pressure"])
+                    age = st.selectbox("Park Age", ["Unknown", "< 1 Year", "1-5 Years", "5-10 Years", "10+ Years"])
+                with c3:
+                    tech_category = st.selectbox("Component", ["Activator (Button)", "Solenoid Valve", "Controller", "Pump", "Structure/Fiberglass"])
+
+                st.caption("3. THE TECHNICAL FIX")
+                # This field replaces the vague "Failure Mode" from your CRM
+                root_cause_type = st.selectbox("Root Cause", 
+                    ["Wear & Tear", "Debris / Blockage", "Installation Error", "Manufacturing Defect", "Environmental (Freeze/Lightning)", "User Error"])
                 
-                symptom = st.text_input("Symptom Observed", placeholder="e.g. Valve clicking but not opening")
-                root_cause = st.text_input("Root Cause", placeholder="e.g. Diaphragm stuck from winter storage")
-                fix = st.text_area("Action Taken", placeholder="e.g. Disassembled and lubricated seal.")
+                specific_diagnosis = st.text_input("Specific Diagnosis", 
+                    placeholder="e.g. Polara Switch failed (Internal spring collapsed)")
+
+                fix_action = st.text_area("Resolution / Action Taken", 
+                    placeholder="e.g. Replaced switch with new Black Polara unit. Verified click.")
                 
                 submitted = st.form_submit_button("💾 Save to Hive Mind")
                 
                 if submitted:
-                    if symptom and fix:
+                    if customer_verbatim and fix_action:
                         new_case = {
                             "id": datetime.now().strftime("%Y%m%d-%H%M%S"),
                             "date": datetime.now().strftime("%Y-%m-%d"),
-                            "category": cat,
-                            "tags": tags,
-                            "symptom": symptom,
-                            "diagnosis": root_cause,
-                            "fix": fix
+                            "customer_verbatim": customer_verbatim,
+                            "lifecycle": lifecycle,
+                            "age": age,
+                            "tech_category": tech_category,
+                            "root_cause_type": root_cause_type,
+                            "specific_diagnosis": specific_diagnosis,
+                            "fix_action": fix_action
                         }
                         save_case(new_case)
-                        st.success("✅ Logged successfully!")
+                        st.success("✅ Logged! This is high-quality training data.")
                     else:
-                        st.warning("⚠️ Symptom and Fix are required.")
+                        st.warning("⚠️ Please fill in 'Customer Voice' and 'Resolution'.")
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- RIGHT COL: THE HIVE MIND ---
+    # --- RIGHT COL: THE SEARCH ENGINE ---
     with col_search:
-        st.markdown("### 🔍 Search Hive")
+        st.markdown("### 🔍 Search Knowledge Base")
         query = st.text_input("Search symptoms...", placeholder="Type to search...", label_visibility="collapsed")
         
-        results = list(search_cases(query, load_data()))
+        all_cases = load_data()
+        results = list(search_cases(query, all_cases))
         
         st.markdown(f"<div style='color: #8898aa; font-size: 0.8rem; margin-bottom: 10px;'>Found {len(results)} records</div>", unsafe_allow_html=True)
         
+        if not results and not query:
+            st.info("Start logging cases to build the brain!")
+        
         for case in results:
-            # Dynamic Icon based on category
+            # Dynamic Icon
             icon = "🔧"
-            if case['category'] == "Controller": icon = "⚡"
-            if case['category'] == "Solenoid Valve": icon = "💧"
+            if "Activator" in case['tech_category']: icon = "🔴"
+            if "Valve" in case['tech_category']: icon = "💧"
+            if "Controller" in case['tech_category']: icon = "⚡"
             
-            with st.expander(f"{icon} {case['symptom']}"):
-                st.markdown(f"**Cause:** {case['diagnosis']}")
-                st.markdown(f"**Fix:** {case['fix']}")
-                st.markdown(f"<small style='color:#f58025'>Tags: {', '.join(case['tags'])}</small>", unsafe_allow_html=True)
+            with st.expander(f"{icon} {case.get('specific_diagnosis', 'Unknown Issue')}"):
+                st.markdown(f"**Customer Said:** *\"{case.get('customer_verbatim', 'N/A')}\"*")
+                st.markdown(f"**The Fix:** {case.get('fix_action', 'N/A')}")
+                st.markdown(f"<small style='color:#f58025'>Cause: {case.get('root_cause_type')} | Context: {case.get('lifecycle')}</small>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
